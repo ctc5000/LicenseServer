@@ -22,7 +22,7 @@ const { licenseCheckLimiter } = require('../middleware/rateLimiter');
  *             properties:
  *               license:
  *                 type: string
- *                 example: "DEMO-PREMIUM-12345-ABCDE"
+ *                 example: "LIC-010-JKLM-NOPQ-0123"
  *               version:
  *                 type: string
  *                 example: "v1.0.0"

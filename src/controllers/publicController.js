@@ -16,7 +16,7 @@ const checkLicense = async (req, res, next) => {
             return res.json({
                 scope: false,
                 license: false,
-                version: null,
+                version:null,
                 needUpdate: false
             });
         }
@@ -44,7 +44,7 @@ const checkLicense = async (req, res, next) => {
             scope: isVersionMatch,
             license: true,
             version: module.current_version,
-            needUpdate: !isVersionMatch
+            needUpdate: version==null?false: !isVersionMatch
         });
 
     } catch (err) {

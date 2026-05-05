@@ -2,6 +2,9 @@
 
 module.exports = {
     up: async (queryInterface, Sequelize) => {
+        const tableExists = await queryInterface.tableExists('Licenses');
+        if (tableExists) return;
+
         await queryInterface.createTable('Licenses', {
             id: {
                 type: Sequelize.INTEGER,
@@ -36,8 +39,16 @@ module.exports = {
             }
         });
 
-        await queryInterface.addIndex('Licenses', ['license_key']);
-        await queryInterface.addIndex('Licenses', ['module_id']);
+        const indexes = await queryInterface.showIndex('Licenses');
+        const hasLicenseKeyIndex = indexes.some(idx => idx.name === 'licenses_license_key');
+        const hasModuleIdIndex = indexes.some(idx => idx.name === 'licenses_module_id');
+
+        if (!hasLicenseKeyIndex) {
+            await queryInterface.addIndex('Licenses', ['license_key']);
+        }
+        if (!hasModuleIdIndex) {
+            await queryInterface.addIndex('Licenses', ['module_id']);
+        }
     },
 
     down: async (queryInterface, Sequelize) => {

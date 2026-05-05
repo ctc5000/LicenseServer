@@ -2,6 +2,9 @@
 
 module.exports = {
     up: async (queryInterface, Sequelize) => {
+        const tableExists = await queryInterface.tableExists('ModuleVersions');
+        if (tableExists) return;
+
         await queryInterface.createTable('ModuleVersions', {
             id: {
                 type: Sequelize.INTEGER,
@@ -35,7 +38,12 @@ module.exports = {
             }
         });
 
-        await queryInterface.addIndex('ModuleVersions', ['module_id', 'version']);
+        const indexes = await queryInterface.showIndex('ModuleVersions');
+        const hasCompositeIndex = indexes.some(idx => idx.name === 'module_versions_module_id_version');
+
+        if (!hasCompositeIndex) {
+            await queryInterface.addIndex('ModuleVersions', ['module_id', 'version']);
+        }
     },
 
     down: async (queryInterface, Sequelize) => {

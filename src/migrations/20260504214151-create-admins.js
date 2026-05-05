@@ -2,6 +2,9 @@
 
 module.exports = {
     up: async (queryInterface, Sequelize) => {
+        const tableExists = await queryInterface.tableExists('Admins');
+        if (tableExists) return;
+
         await queryInterface.createTable('Admins', {
             id: {
                 type: Sequelize.INTEGER,

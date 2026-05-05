@@ -2,6 +2,9 @@
 
 module.exports = {
     up: async (queryInterface, Sequelize) => {
+        const tableInfo = await queryInterface.describeTable('Licenses');
+        if (tableInfo.status) return;
+
         await queryInterface.addColumn('Licenses', 'status', {
             type: Sequelize.STRING(50),
             defaultValue: 'active',

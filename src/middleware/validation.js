@@ -3,7 +3,7 @@ const Joi = require('joi');
 const validateLicenseCheck = (req, res, next) => {
     const schema = Joi.object({
         license: Joi.string().required(),
-        version: Joi.string().required() // Убрали паттерн, теперь любая строка
+        version: Joi.string()
     });
 
     const { error } = schema.validate(req.body);
