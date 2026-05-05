@@ -196,7 +196,93 @@ const downloadModule = async (req, res, next) => {
         next(err);
     }
 };
+// Проверка существования лицензии (без проверки версии)
+const checkLicenseExists = async (req, res, next) => {
+    try {
+        const { license } = req.query; // или req.params / req.body
 
+        if (!license) {
+            return res.status(400).json({ error: 'Требуется параметр license' });
+        }
+
+        // Ищем лицензию в таблице Licenses
+        const licenseRecord = await db.License.findOne({
+            where: {
+                license_key: license,
+                is_active: true  // только активные лицензии
+            }
+        });
+
+        // Проверяем срок действия
+        let isValid = false;
+        if (licenseRecord) {
+            const now = new Date();
+            const isNotExpired = !licenseRecord.expires_at || new Date(licenseRecord.expires_at) >= now;
+            isValid = isNotExpired;
+        }
+
+        res.json({
+            exists: isValid,
+            license: license,
+            valid: isValid
+        });
+
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Проверка существования лицензии (включая неактивные и просроченные)
+const checkLicenseExistsAny = async (req, res, next) => {
+    try {
+        const { license } = req.query;
+
+        if (!license) {
+            return res.status(400).json({ error: 'Требуется параметр license' });
+        }
+
+        // Ищем лицензию в таблице Licenses (даже неактивные)
+        const licenseRecord = await db.License.findOne({
+            where: { license_key: license },
+            include: [{ model: db.Module, attributes: ['title', 'current_version'] }]
+        });
+
+        let status = 'not_found';
+        let moduleInfo = null;
+
+        if (licenseRecord) {
+            const now = new Date();
+            const isExpired = licenseRecord.expires_at && new Date(licenseRecord.expires_at) < now;
+
+            if (!licenseRecord.is_active) {
+                status = 'inactive';
+            } else if (isExpired) {
+                status = 'expired';
+            } else {
+                status = 'active';
+            }
+
+            moduleInfo = {
+                module_id: licenseRecord.module_id,
+                module_title: licenseRecord.Module?.title,
+                current_version: licenseRecord.Module?.current_version,
+                expires_at: licenseRecord.expires_at,
+                status: licenseRecord.status
+            };
+        }
+
+        res.json({
+            exists: !!licenseRecord,
+            valid: status === 'active',
+            status: status,
+            license: license,
+            module: moduleInfo
+        });
+
+    } catch (err) {
+        next(err);
+    }
+};
 module.exports = {
     checkLicense,
     getModules,
@@ -204,5 +290,7 @@ module.exports = {
     getModuleVersions,
     getModuleGallery,
     getModuleNews,
-    downloadModule
+    downloadModule,
+    checkLicenseExistsAny,
+    checkLicenseExists,
 };

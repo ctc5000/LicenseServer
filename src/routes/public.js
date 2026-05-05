@@ -159,5 +159,71 @@ router.get('/modules/:id/news', publicController.getModuleNews);
  *         description: Недействительная лицензия
  */
 router.get('/modules/:id/download', publicController.downloadModule);
+/**
+ * @swagger
+ * /api/license/check-exists:
+ *   get:
+ *     summary: Проверка существования лицензии (только активные)
+ *     tags: [Public]
+ *     parameters:
+ *       - in: query
+ *         name: license
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Серийный номер лицензии
+ *     responses:
+ *       200:
+ *         description: Результат проверки
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 exists:
+ *                   type: boolean
+ *                 valid:
+ *                   type: boolean
+ *                 license:
+ *                   type: string
+ */
+router.get('/license/check-exists', publicController.checkLicenseExists);
+
+/**
+ * @swagger
+ * /api/license/check-exists-any:
+ *   get:
+ *     summary: Проверка существования лицензии (включая неактивные)
+ *     tags: [Public]
+ *     parameters:
+ *       - in: query
+ *         name: license
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Детальная информация о лицензии
+ */
+router.get('/license/check-exists-any', publicController.checkLicenseExistsAny);
+
+/**
+ * @swagger
+ * /api/license/check-exists-any:
+ *   post:
+ *     summary: Проверка существования лицензии (включая неактивные)
+ *     tags: [Public]
+ *     parameters:
+ *       - in: query
+ *         name: license
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Детальная информация о лицензии
+ */
+router.post('/license/check-exists', publicController.checkLicenseExists);
+
 
 module.exports = router;
