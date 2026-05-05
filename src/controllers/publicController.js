@@ -1,5 +1,7 @@
 const db = require('../models');
 const { Op } = require('sequelize');
+const path = require('path');
+const fs = require('fs');
 
 const checkLicense = async (req, res, next) => {
     try {

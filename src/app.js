@@ -1,4 +1,11 @@
 require('dotenv').config();
+
+// Проверка обязательных переменных окружения
+if (!process.env.JWT_SECRET) {
+    console.error('❌ JWT_SECRET is required');
+    process.exit(1);
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -32,8 +39,8 @@ app.use(
 );
 
 app.use(cors());
-app.use(express.json({ limit: '5000mb' }));
-app.use(express.urlencoded({ extended: true, limit: '5000mb' }));
+app.use(express.json({ limit: '3000mb' }));
+app.use(express.urlencoded({ extended: true, limit: '3000mb' }));
 
 // Статика - ПРАВИЛЬНЫЙ ПУТЬ к uploads
 
@@ -55,19 +62,26 @@ app.use('/api', publicRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/', webRoutes);
 
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check с проверкой БД
+app.get('/health', async (req, res) => {
+    try {
+        await db.sequelize.authenticate();
+        res.json({
+            status: 'ok',
+            database: 'connected',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(503).json({
+            status: 'error',
+            database: 'disconnected',
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Error handler
 app.use(errorHandler);
-app.use(express.static(path.join(__dirname, '../uploads'), {
-    setHeaders: (res, filePath) => {
-        // Для файлов в uploads - принудительное скачивание
-        res.setHeader('Content-Disposition', 'attachment');
-    }
-}));
 // Sync database and start server
 const startServer = async () => {
     try {
@@ -83,7 +97,7 @@ const startServer = async () => {
             console.log(`🚀 Server running on http://localhost:${PORT}`);
             console.log(`📚 Swagger UI: http://localhost:${PORT}/api-docs`);
             console.log(`🔐 Admin panel: http://localhost:${PORT}/admin`);
-            console.log(`👤 Admin login: admin / admin123`);
+            console.log(`👤 Admin panel ready`);
             console.log(`📁 Uploads directory: ${uploadsDir}`);
             console.log(`📁 Static URL: http://localhost:${PORT}/uploads/`);
         });
