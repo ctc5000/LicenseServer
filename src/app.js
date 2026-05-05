@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const fs = require('fs');
 const swaggerUi = require('swagger-ui-express');
 
 const db = require('./models');
@@ -16,10 +17,13 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Временно отключаем helmet полностью для разработки
-// app.use(helmet());
+// Создаем папку uploads если её нет
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('📁 Created uploads directory:', uploadsDir);
+}
 
-// Включаем только базовую защиту без CSP
 app.use(
     helmet({
         contentSecurityPolicy: false,
@@ -28,8 +32,11 @@ app.use(
 );
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '5000mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5000mb' }));
+
+// Статика - ПРАВИЛЬНЫЙ ПУТЬ к uploads
+app.use('/uploads', express.static(uploadsDir));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // View engine
@@ -54,14 +61,18 @@ app.get('/health', (req, res) => {
 
 // Error handler
 app.use(errorHandler);
-
+app.use(express.static(path.join(__dirname, '../uploads'), {
+    setHeaders: (res, filePath) => {
+        // Для файлов в uploads - принудительное скачивание
+        res.setHeader('Content-Disposition', 'attachment');
+    }
+}));
 // Sync database and start server
 const startServer = async () => {
     try {
         await db.sequelize.authenticate();
         console.log('✅ Database connected successfully');
 
-        // Запускаем миграции автоматически (только в development)
         if (process.env.NODE_ENV === 'development') {
             await db.sequelize.sync();
             console.log('📦 Database synced');
@@ -72,6 +83,8 @@ const startServer = async () => {
             console.log(`📚 Swagger UI: http://localhost:${PORT}/api-docs`);
             console.log(`🔐 Admin panel: http://localhost:${PORT}/admin`);
             console.log(`👤 Admin login: admin / admin123`);
+            console.log(`📁 Uploads directory: ${uploadsDir}`);
+            console.log(`📁 Static URL: http://localhost:${PORT}/uploads/`);
         });
     } catch (error) {
         console.error('❌ Database connection failed:', error);

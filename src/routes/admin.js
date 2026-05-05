@@ -20,7 +20,7 @@ router.use(authenticateJWT, requireAdmin);
 
 // Модули
 router.get('/modules', adminController.getModules);
-router.get('/modules/:id', adminController.getModuleById);  // ✅ ДОБАВИТЬ ЭТУ СТРОКУ
+router.get('/modules/:id', adminController.getModuleById);
 router.post('/modules', validateModule, adminController.createModule);
 router.put('/modules/:id', validateModule, adminController.updateModule);
 router.delete('/modules/:id', adminController.deleteModule);
@@ -43,44 +43,102 @@ router.post('/modules/:id/gallery', adminController.addGalleryImage);
 router.put('/gallery/:id', adminController.updateGallerySort);
 router.delete('/gallery/:id', adminController.deleteGalleryImage);
 
-// Новости
+// Новости (для модуля)
 router.get('/modules/:id/news', adminController.getNews);
 router.post('/modules/:id/news', validateNews, adminController.createNews);
 router.put('/news/:id', validateNews, adminController.updateNews);
 router.delete('/news/:id', adminController.deleteNews);
-// Новости (глобальные, без привязки к модулю)
+
+// Новости (глобальные)
 router.get('/news', adminController.getAllNews);
 router.get('/news/:id', adminController.getNewsById);
 router.post('/news', validateNews, adminController.createGlobalNews);
 router.put('/news/:id', validateNews, adminController.updateGlobalNews);
 router.delete('/news/:id', adminController.deleteGlobalNews);
 
+// ============ НАСТРОЙКА ЗАГРУЗКИ ФАЙЛОВ ============
+const uploadDir = path.join(process.cwd(), 'uploads');
 
-// Настройка загрузки файлов
-const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// Создаем папку если нет
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    console.log('📁 Uploads directory created:', uploadDir);
+}
 
+// Общая настройка storage
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
     filename: (req, file, cb) => {
         const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, unique + path.extname(file.originalname));
+        const ext = path.extname(file.originalname);
+        cb(null, unique + ext);
     }
 });
 
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+// Фильтр только для изображений
+const imageFilter = (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp|bmp|svg/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (mimetype && extname) {
+        return cb(null, true);
+    }
+    cb(new Error('Only images are allowed (jpeg, jpg, png, gif, webp, bmp, svg)'));
+};
 
-router.post('/upload/image', authenticateJWT, requireAdmin, upload.single('file'), (req, res) => {
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+// Без фильтра - для любых файлов
+const noFilter = (req, file, cb) => {
+    cb(null, true);
+};
+
+// Настройка загрузки с разными лимитами
+const uploadImage = multer({
+    storage,
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB для картинок
+    fileFilter: imageFilter
+});
+
+const uploadAnyFile = multer({
+    storage,
+    limits: { fileSize: 1024 * 1024 * 1024 }, // 1GB для файлов
+    fileFilter: noFilter
+});
+
+// Эндпоинты для загрузки
+router.post('/upload/image', authenticateJWT, requireAdmin, uploadImage.single('file'), (req, res) => {
+    const fileUrl = `/uploads/${req.file.filename}`;
+    console.log('✅ Image uploaded:', fileUrl);
     res.json({ url: fileUrl });
 });
 
-router.post('/upload/file', authenticateJWT, requireAdmin, upload.single('file'), (req, res) => {
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+router.post('/upload/file', authenticateJWT, requireAdmin, uploadAnyFile.single('file'), (req, res) => {
+    const fileUrl = `/uploads/${req.file.filename}`;
+    console.log('✅ File uploaded:', fileUrl);
     res.json({ url: fileUrl });
 });
 
-// Раздача статики для uploads
-router.use('/uploads', express.static(uploadDir))
+// Универсальный эндпоинт
+router.post('/upload', authenticateJWT, requireAdmin, uploadAnyFile.single('file'), (req, res) => {
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+});
+
+// Маршрут для скачивания/просмотра файлов
+router.get('/uploads/:filename', (req, res) => {
+    const filepath = path.join(uploadDir, req.params.filename);
+    if (fs.existsSync(filepath)) {
+        const ext = path.extname(req.params.filename).toLowerCase();
+        const imageExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+        if (imageExt.includes(ext)) {
+            res.sendFile(filepath);
+        } else {
+            res.download(filepath);
+        }
+    } else {
+        res.status(404).json({ error: 'File not found', path: filepath });
+    }
+});
 
 module.exports = router;

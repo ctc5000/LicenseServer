@@ -43,7 +43,19 @@ const getModules = async (req, res, next) => {
 
 const createModule = async (req, res, next) => {
     try {
-        const module = await db.Module.create(req.body);
+        const createData = { ...req.body };
+
+        // Если file_url относительный - преобразуем
+        if (createData.file_url && createData.file_url.startsWith('/uploads/')) {
+            createData.file_url = `${req.protocol}://${req.get('host')}${createData.file_url}`;
+        }
+
+        // Если preview_image относительный - преобразуем
+        if (createData.preview_image && createData.preview_image.startsWith('/uploads/')) {
+            createData.preview_image = `${req.protocol}://${req.get('host')}${createData.preview_image}`;
+        }
+
+        const module = await db.Module.create(createData);
         res.status(201).json(module);
     } catch (err) {
         next(err);
@@ -57,7 +69,19 @@ const updateModule = async (req, res, next) => {
             return res.status(404).json({ error: 'Модуль не найден' });
         }
 
-        await module.update(req.body);
+        const updateData = { ...req.body };
+
+        // Если file_url относительный - преобразуем
+        if (updateData.file_url && updateData.file_url.startsWith('/uploads/')) {
+            updateData.file_url = `${req.protocol}://${req.get('host')}${updateData.file_url}`;
+        }
+
+        // Если preview_image относительный - преобразуем
+        if (updateData.preview_image && updateData.preview_image.startsWith('/uploads/')) {
+            updateData.preview_image = `${req.protocol}://${req.get('host')}${updateData.preview_image}`;
+        }
+
+        await module.update(updateData);
         res.json(module);
     } catch (err) {
         next(err);
@@ -340,7 +364,6 @@ const getModuleById = async (req, res, next) => {
 const getAllNews = async (req, res, next) => {
     try {
         const news = await db.ModuleNews.findAll({
-            where: { module_id: null },  // Только глобальные новости
             order: [['published_at', 'DESC']]
         });
         res.json(news);
@@ -361,9 +384,10 @@ const getNewsById = async (req, res, next) => {
 
 const createGlobalNews = async (req, res, next) => {
     try {
-        const { title, content, image_url, published_at } = req.body;
+        const { title, content, image_url, published_at, module_id } = req.body;
+
         const news = await db.ModuleNews.create({
-            module_id: null,
+            module_id: module_id || null,
             title,
             content,
             image_url: image_url || null,
@@ -380,12 +404,14 @@ const updateGlobalNews = async (req, res, next) => {
         const news = await db.ModuleNews.findByPk(req.params.id);
         if (!news) return res.status(404).json({ error: 'Новость не найдена' });
 
-        const { title, content, image_url, published_at } = req.body;
+        const { title, content, image_url, published_at, module_id } = req.body;
+
         await news.update({
-            title: title || news.title,
-            content: content || news.content,
+            title: title !== undefined ? title : news.title,
+            content: content !== undefined ? content : news.content,
             image_url: image_url !== undefined ? image_url : news.image_url,
-            published_at: published_at || news.published_at
+            published_at: published_at || news.published_at,
+            module_id: module_id !== undefined ? (module_id || null) : news.module_id
         });
         res.json(news);
     } catch (err) {

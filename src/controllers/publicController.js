@@ -55,9 +55,19 @@ const checkLicense = async (req, res, next) => {
 const getModules = async (req, res, next) => {
     try {
         const modules = await db.Module.findAll({
-            attributes: ['id', 'title', 'description', 'preview_image', 'current_version'],
+            attributes: ['id', 'title', 'description', 'preview_image', 'file_url', 'current_version', 'created_at', 'updated_at'],
+            include: [
+                {
+                    model: db.ModuleGallery,
+                    as: 'ModuleGalleries', // если ассоциация имеет алиас
+                    attributes: ['id', 'image_url', 'sort_order'],
+                    separate: true,
+                    order: [['sort_order', 'ASC']]
+                }
+            ],
             order: [['created_at', 'DESC']]
         });
+
         res.json(modules);
     } catch (err) {
         next(err);
@@ -128,7 +138,6 @@ const downloadModule = async (req, res, next) => {
             return res.status(400).json({ error: 'Требуется лицензия' });
         }
 
-        // Проверка лицензии
         const licenseRecord = await db.License.findOne({
             where: {
                 license_key: license,
@@ -141,7 +150,6 @@ const downloadModule = async (req, res, next) => {
             return res.status(403).json({ error: 'Недействительная лицензия' });
         }
 
-        // Проверка срока действия
         if (licenseRecord.expires_at && new Date(licenseRecord.expires_at) < new Date()) {
             return res.status(403).json({ error: 'Лицензия истекла' });
         }
@@ -151,8 +159,38 @@ const downloadModule = async (req, res, next) => {
             return res.status(404).json({ error: 'Модуль не найден' });
         }
 
-        // Редирект на URL файла
-        res.json({ download_url: module.file_url });
+        const fileUrl = module.file_url;
+
+        if (!fileUrl) {
+            return res.status(404).json({ error: 'URL файла не указан' });
+        }
+
+        if (fileUrl.startsWith('/uploads/')) {
+            const filename = path.basename(fileUrl);
+            const filePath = path.join(__dirname, '../../uploads', filename);
+
+            if (fs.existsSync(filePath)) {
+                const ext = path.extname(filename);
+                const downloadName = `${module.title}_v${module.current_version}${ext}`;
+                const safeFileName = downloadName.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+                // Используем res.download с явным указанием имени файла
+                res.download(filePath, safeFileName, (err) => {
+                    if (err) {
+                        console.error('Download error:', err);
+                        if (!res.headersSent) {
+                            res.status(500).json({ error: 'Ошибка при скачивании' });
+                        }
+                    }
+                });
+            } else {
+                res.status(404).json({ error: 'Файл не найден' });
+            }
+        } else if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+            res.redirect(fileUrl);
+        } else {
+            res.status(404).json({ error: 'Некорректный URL' });
+        }
 
     } catch (err) {
         next(err);

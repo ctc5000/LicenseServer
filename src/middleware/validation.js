@@ -17,9 +17,9 @@ const validateModule = (req, res, next) => {
     const schema = Joi.object({
         title: Joi.string().min(1).max(255).required(),
         description: Joi.string().allow('', null),
-        preview_image: Joi.string().uri().allow('', null),
-        file_url: Joi.string().uri().required(),
-        current_version: Joi.string().required() // Убрали паттерн
+        preview_image: Joi.string().allow('', null).optional(), // убираем проверку на uri
+        file_url: Joi.string().allow('', null).optional(), // убираем проверку на uri
+        current_version: Joi.string().required()
     });
 
     const { error } = schema.validate(req.body);
@@ -63,8 +63,8 @@ const validateNews = (req, res, next) => {
         title: Joi.string().min(1).max(255).required(),
         content: Joi.string().min(1).required(),
         published_at: Joi.date(),
-        image_url: Joi.string().uri().allow('', null).optional(),  // Добавить!
-        module_id: Joi.number().allow(null).optional()  // Добавить!
+        image_url: Joi.any().allow('', null).optional(),
+        module_id: Joi.number().allow(null).optional()
     });
 
     const { error } = schema.validate(req.body);
