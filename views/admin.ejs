@@ -52,58 +52,79 @@
     </div>
 </div>
 
-<!-- Modal для модуля -->
-<div class="modal-fullscreen" id="moduleModal">
+<!-- Modal for Module -->
+<div id="moduleModal" class="modal-fullscreen" style="display: none;">
     <div class="modal-container">
         <div class="modal-header">
-            <h3 id="moduleModalTitle">Создание модуля</h3>
-            <button class="close-btn" id="closeModalBtn">&times;</button>
+            <h3 id="moduleModalTitle">Модуль</h3>
+            <button type="button" class="close-btn" id="closeModalBtn">&times;</button>
         </div>
         <div class="modal-body">
             <form id="moduleForm">
                 <input type="hidden" id="moduleId">
+
                 <div class="row">
                     <div class="col-6">
                         <div class="form-group">
-                            <label class="form-label">Заголовок *</label>
+                            <label class="form-label">Название модуля *</label>
                             <input type="text" id="moduleTitle" class="form-control" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Описание</label>
-                            <textarea id="moduleDescription" class="form-control" rows="4"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Превью</label>
-                            <input type="file" id="previewImageFile" class="form-control" accept="image/*">
-                            <div id="previewContainer" class="mt-2"></div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Файл модуля</label>
-                            <input type="file" id="moduleFile" class="form-control">
-                            <small class="text-muted">ZIP, RAR, APK, EXE и др.</small>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">URL файла</label>
-                            <input type="text" id="moduleFileUrl" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Версия *</label>
-                            <input type="text" id="moduleVersion" class="form-control" required>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="form-group">
-                            <label class="form-label">Галерея</label>
-                            <input type="file" id="galleryImageInput" class="form-control" accept="image/*" multiple>
-                            <div id="galleryContainer" class="gallery-horizontal mt-2"></div>
+                            <label class="form-label">Версия *</label>
+                            <input type="text" id="moduleVersion" class="form-control" placeholder="1.0.0" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Описание</label>
+                    <textarea id="moduleDescription" class="form-control" rows="3"></textarea>
+                </div>
+
+                <div class="row">
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label class="form-label">Превью изображение</label>
+                            <input type="file" id="previewImageFile" class="form-control" accept="image/*">
+                            <input type="hidden" id="modulePreview">
+                            <div id="previewContainer" class="mt-2"></div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label class="form-label">Файл модуля</label>
+                            <input type="file" id="moduleFile" class="form-control">
+                            <input type="hidden" id="moduleFileUrl">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Галерея изображений</label>
+                    <div class="gallery-upload-area">
+                        <div class="upload-zone" id="uploadZone">
+                            <i class="bi bi-cloud-upload"></i>
+                            <p>Перетащите изображения сюда или нажмите для выбора</p>
+                            <button type="button" class="btn-upload" onclick="document.getElementById('galleryImageInput').click()">
+                                <i class="bi bi-plus"></i> Выбрать файлы
+                            </button>
+                            <input type="file" id="galleryImageInput" multiple accept="image/*" style="display: none;">
+                        </div>
+                    </div>
+                    <div class="gallery-container" id="galleryContainer">
+                        <div class="empty-gallery">
+                            <i class="bi bi-images"></i>
+                            <p>Нет изображений в галерее</p>
                         </div>
                     </div>
                 </div>
             </form>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" id="cancelModalBtn">Отмена</button>
-            <button class="btn btn-primary" id="saveModuleBtn">Сохранить</button>
+            <button type="button" class="btn btn-secondary" id="cancelModalBtn">Отмена</button>
+            <button type="button" class="btn btn-primary" id="saveModuleBtn">Сохранить</button>
         </div>
     </div>
 </div>

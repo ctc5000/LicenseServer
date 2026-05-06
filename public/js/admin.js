@@ -29,6 +29,9 @@ function getPlaceholderImage(text = 'No image') {
 }
 
 // ============ ГАЛЕРЕЯ ============
+let draggedImageId = null;
+
+// Функция загрузки галереи с улучшенным UI
 async function loadGallery(moduleId) {
     try {
         const response = await fetch(`${API_URL}/api/admin/modules/${moduleId}/gallery`, { headers });
@@ -36,48 +39,67 @@ async function loadGallery(moduleId) {
         currentGalleryImages = gallery;
 
         const container = document.getElementById('galleryContainer');
-        const emptyMsg = document.getElementById('emptyGalleryMsg');
-
         if (!container) return;
 
         if (gallery.length === 0) {
-            if (emptyMsg) emptyMsg.style.display = 'block';
-            container.innerHTML = '<div class="text-muted p-3 text-center w-100" id="emptyGalleryMsg">Нет изображений в галерее</div>';
+            container.innerHTML = `
+                <div class="empty-gallery">
+                    <i class="bi bi-images"></i>
+                    <p>Нет изображений в галерее</p>
+                    <small class="text-muted">Перетащите изображения или нажмите кнопку выше для загрузки</small>
+                </div>
+            `;
             return;
         }
 
-        if (emptyMsg) emptyMsg.style.display = 'none';
-
-        let html = '';
+        let html = `<div class="gallery-horizontal" id="galleryHorizontal">`;
         gallery.forEach((img, index) => {
             let imgUrl = img.image_url;
             if (imgUrl && imgUrl.startsWith('/uploads/')) {
                 imgUrl = `${API_URL}${imgUrl}`;
             }
             html += `
-                <div class="gallery-item position-relative" data-id="${img.id}" data-index="${index}" style="min-width: 100px; cursor: grab;">
-                    <img src="${imgUrl}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px;" 
+                <div class="gallery-item" data-id="${img.id}" data-index="${index}" draggable="true">
+                    <img src="${imgUrl}" alt="Gallery ${index + 1}" 
                          onerror="this.src='${getPlaceholderImage('Error')}'">
-                    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" 
-                            style="width: 24px; height: 24px; padding: 0; font-size: 12px; border-radius: 50%;"
-                            onclick="removeGalleryImage(${img.id})">
+                    <button type="button" class="remove-btn" onclick="removeGalleryImage(${img.id})">
                         <i class="bi bi-x"></i>
                     </button>
-                    <div class="text-center small mt-1">${index + 1}</div>
+                    <div class="order-badge">#${index + 1}</div>
                 </div>
             `;
         });
-
+        html += `</div>`;
         container.innerHTML = html;
+
+        // Инициализируем drag and drop после загрузки
         initDragAndDrop();
+
+        // Обновляем статистику
+        updateGalleryStats(gallery.length);
 
     } catch (err) {
         console.error('Error loading gallery:', err);
+        const container = document.getElementById('galleryContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="empty-gallery">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <p>Ошибка загрузки галереи</p>
+                </div>
+            `;
+        }
     }
 }
-
+// Обновление статистики галереи
+function updateGalleryStats(count) {
+    const statsEl = document.querySelector('.gallery-stats');
+    if (statsEl) {
+        statsEl.textContent = `${count} ${count === 1 ? 'изображение' : 'изображений'}`;
+    }
+}
 function initDragAndDrop() {
-    const container = document.getElementById('galleryContainer');
+    const container = document.getElementById('galleryHorizontal');
     if (!container) return;
 
     let draggedItem = null;
@@ -89,22 +111,33 @@ function initDragAndDrop() {
 
         item.addEventListener('dragstart', (e) => {
             draggedItem = item;
-            item.style.opacity = '0.5';
+            draggedImageId = item.dataset.id;
+            item.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', item.dataset.id);
         });
 
         item.addEventListener('dragend', (e) => {
-            item.style.opacity = '';
+            item.classList.remove('dragging');
             draggedItem = null;
+            draggedImageId = null;
         });
 
         item.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
+            item.style.transform = 'scale(1.02)';
+        });
+
+        item.addEventListener('dragleave', (e) => {
+            item.style.transform = '';
         });
 
         item.addEventListener('drop', async (e) => {
             e.preventDefault();
+            e.stopPropagation();
+            item.style.transform = '';
+
             if (!draggedItem || draggedItem === item) return;
 
             const fromIndex = parseInt(draggedItem.dataset.index);
@@ -112,76 +145,387 @@ function initDragAndDrop() {
 
             if (isNaN(fromIndex) || isNaN(toIndex)) return;
 
+            // Показываем индикатор загрузки
+            showLoadingIndicator(true);
+
             // Меняем порядок в массиве
             const reordered = [...currentGalleryImages];
             const [movedItem] = reordered.splice(fromIndex, 1);
             reordered.splice(toIndex, 0, movedItem);
 
             // Обновляем sort_order на сервере
+            let hasErrors = false;
             for (let i = 0; i < reordered.length; i++) {
                 const img = reordered[i];
                 if (img.sort_order !== i) {
-                    await fetch(`${API_URL}/api/admin/gallery/${img.id}`, {
-                        method: 'PUT',
-                        headers: { ...headers, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ sort_order: i })
-                    });
+                    try {
+                        await fetch(`${API_URL}/api/admin/gallery/${img.id}`, {
+                            method: 'PUT',
+                            headers: { ...headers, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sort_order: i })
+                        });
+                    } catch (err) {
+                        console.error('Error updating order:', err);
+                        hasErrors = true;
+                    }
                 }
+            }
+
+            if (hasErrors) {
+                showNotification('Ошибка при сохранении порядка', 'error');
+            } else {
+                showNotification('Порядок изображений обновлен', 'success');
             }
 
             // Перезагружаем галерею
             await loadGallery(currentModuleId);
+            showLoadingIndicator(false);
         });
     });
 }
-
+function showLoadingIndicator(show) {
+    const container = document.getElementById('galleryContainer');
+    if (container && show) {
+        const loader = document.createElement('div');
+        loader.id = 'galleryLoader';
+        loader.className = 'gallery-loader';
+        loader.innerHTML = '<div class="spinner"></div><p>Обновление...</p>';
+        if (!document.getElementById('galleryLoader')) {
+            container.style.position = 'relative';
+            container.appendChild(loader);
+        }
+    } else {
+        const loader = document.getElementById('galleryLoader');
+        if (loader) loader.remove();
+    }
+}
 async function addGalleryImages() {
     const input = document.getElementById('galleryImageInput');
-    if (!input) {
-        console.error('galleryImageInput not found');
-        return;
-    }
+    if (!input || !input.files.length) return;
 
     const files = Array.from(input.files);
-    if (files.length === 0) return;
+    let successCount = 0;
+    let errorCount = 0;
 
     for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
+        // Проверка типа файла
+        if (!file.type.startsWith('image/')) {
+            showNotification(`${file.name} - не изображение`, 'error');
+            errorCount++;
+            continue;
+        }
 
-        const uploadRes = await fetch(`${API_URL}/api/admin/upload/image`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
+        // Проверка размера (макс 20MB)
+        if (file.size > 20 * 1024 * 1024) {
+            showNotification(`${file.name} - файл слишком большой (макс 20MB)`, 'error');
+            errorCount++;
+            continue;
+        }
 
-        const uploadData = await uploadRes.json();
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
 
-        await fetch(`${API_URL}/api/admin/modules/${currentModuleId}/gallery`, {
-            method: 'POST',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                image_url: uploadData.url,
-                sort_order: currentGalleryImages.length
-            })
-        });
+            const uploadRes = await fetch(`${API_URL}/api/admin/upload/image`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (!uploadRes.ok) throw new Error('Upload failed');
+
+            const uploadData = await uploadRes.json();
+
+            await fetch(`${API_URL}/api/admin/modules/${currentModuleId}/gallery`, {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_url: uploadData.url,
+                    sort_order: currentGalleryImages.length
+                })
+            });
+
+            successCount++;
+        } catch (err) {
+            console.error('Error uploading:', err);
+            errorCount++;
+        }
     }
 
+    // Показываем результат
+    if (successCount > 0) {
+        showNotification(`Загружено ${successCount} ${getDeclension(successCount, 'изображение', 'изображения', 'изображений')}`, 'success');
+    }
+    if (errorCount > 0) {
+        showNotification(`Ошибок: ${errorCount}`, 'error');
+    }
+
+    // Очищаем input и перезагружаем
     if (input) input.value = '';
     await loadGallery(currentModuleId);
 }
+function showNotification(message, type = 'info') {
+    // Удаляем старые уведомления
+    const oldNotification = document.querySelector('.gallery-notification');
+    if (oldNotification) oldNotification.remove();
 
-async function removeGalleryImage(imageId) {
-    if (!confirm('Удалить изображение из галереи?')) return;
+    const notification = document.createElement('div');
+    notification.className = `gallery-notification gallery-notification-${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : 'info-circle'}"></i>
+            <span>${message}</span>
+        </div>
+    `;
 
-    await fetch(`${API_URL}/api/admin/gallery/${imageId}`, {
-        method: 'DELETE',
-        headers
+    // Стили для уведомлений
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 10000;
+        animation: slideInRight 0.3s ease;
+    `;
+
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+// Склонение слов
+function getDeclension(number, one, two, five) {
+    let n = Math.abs(number) % 100;
+    if (n > 10 && n < 20) return five;
+    n = n % 10;
+    if (n === 1) return one;
+    if (n > 1 && n < 5) return two;
+    return five;
+}
+// Инициализация зоны перетаскивания для загрузки
+function initUploadZone() {
+    const uploadZone = document.getElementById('uploadZone');
+    const galleryInput = document.getElementById('galleryImageInput');
+
+    if (!uploadZone || !galleryInput) return;
+
+    // Клик по зоне
+    uploadZone.addEventListener('click', (e) => {
+        if (e.target !== uploadZone.querySelector('.btn-upload')) {
+            galleryInput.click();
+        }
     });
 
-    await loadGallery(currentModuleId);
+    // Drag and drop для загрузки
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('drag-over');
+    });
+
+    uploadZone.addEventListener('dragleave', (e) => {
+        uploadZone.classList.remove('drag-over');
+    });
+
+    uploadZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('drag-over');
+
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+
+        if (files.length === 0) {
+            showNotification('Пожалуйста, перетащите изображения', 'error');
+            return;
+        }
+
+        // Имитируем выбор файлов
+        const dataTransfer = new DataTransfer();
+        files.forEach(file => dataTransfer.items.add(file));
+        galleryInput.files = dataTransfer.files;
+
+        // Загружаем
+        await addGalleryImages();
+    });
+
+    // Выбор файлов через диалог
+    galleryInput.addEventListener('change', async () => {
+        await addGalleryImages();
+    });
 }
 
+// Удаление изображения с подтверждением
+async function removeGalleryImage(imageId) {
+    const result = await showConfirmDialog('Удалить изображение из галереи?', 'Это действие нельзя отменить.');
+    if (!result) return;
+
+    try {
+        await fetch(`${API_URL}/api/admin/gallery/${imageId}`, {
+            method: 'DELETE',
+            headers
+        });
+
+        showNotification('Изображение удалено', 'success');
+        await loadGallery(currentModuleId);
+    } catch (err) {
+        console.error('Error deleting image:', err);
+        showNotification('Ошибка при удалении', 'error');
+    }
+}
+
+// Диалог подтверждения
+function showConfirmDialog(message, subtitle = '') {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'confirm-dialog';
+        modal.innerHTML = `
+            <div class="confirm-dialog-content">
+                <h4>${message}</h4>
+                ${subtitle ? `<p>${subtitle}</p>` : ''}
+                <div class="confirm-dialog-buttons">
+                    <button class="btn btn-secondary confirm-no">Отмена</button>
+                    <button class="btn btn-danger confirm-yes">Удалить</button>
+                </div>
+            </div>
+        `;
+
+        // Стили для диалога
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10001;
+        `;
+
+        const content = modal.querySelector('.confirm-dialog-content');
+        content.style.cssText = `
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            min-width: 300px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('.confirm-no').onclick = () => {
+            modal.remove();
+            resolve(false);
+        };
+
+        modal.querySelector('.confirm-yes').onclick = () => {
+            modal.remove();
+            resolve(true);
+        };
+    });
+}
+// Добавляем CSS анимации для уведомлений
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+    
+    .gallery-notification {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        padding: 12px 20px;
+        min-width: 250px;
+    }
+    
+    .gallery-notification-success {
+        border-left: 4px solid #27ae60;
+    }
+    
+    .gallery-notification-error {
+        border-left: 4px solid #e74c3c;
+    }
+    
+    .notification-content {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .notification-content i {
+        font-size: 20px;
+    }
+    
+    .gallery-notification-success i {
+        color: #27ae60;
+    }
+    
+    .gallery-notification-error i {
+        color: #e74c3c;
+    }
+    
+    .gallery-loader {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255,255,255,0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        z-index: 10;
+    }
+    
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #e9ecef;
+        border-top-color: #4ecdc4;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .gallery-loader p {
+        margin-top: 12px;
+        color: #4ecdc4;
+        font-size: 14px;
+    }
+`;
+document.head.appendChild(style);
+const originalShowModuleModal = showModuleModal;
+window.showModuleModal = function(id = null) {
+    originalShowModuleModal(id);
+    setTimeout(() => {
+        initUploadZone();
+    }, 100);
+};
 // ============ МОДУЛИ ============
 function closeModuleModal() {
     const modal = document.getElementById('moduleModal');
@@ -224,11 +568,19 @@ function showModuleModal(id = null) {
                 document.getElementById('moduleFileUrl').value = module.file_url || '';
                 document.getElementById('moduleVersion').value = module.current_version;
 
+                // Сохраняем оригинальные URL для сравнения
                 if (module.preview_image) {
                     const previewUrl = module.preview_image.startsWith('http') ? module.preview_image : `${API_URL}${module.preview_image}`;
                     document.getElementById('previewContainer').innerHTML = `<img src="${previewUrl}" class="preview-image">`;
+                    // Сохраняем оригинальный URL в скрытое поле или data-атрибут
+                    document.getElementById('modulePreview').value = module.preview_image;
                 } else {
                     document.getElementById('previewContainer').innerHTML = '';
+                    document.getElementById('modulePreview').value = '';
+                }
+
+                if (module.file_url) {
+                    document.getElementById('moduleFileUrl').value = module.file_url;
                 }
 
                 loadGallery(id);
@@ -237,6 +589,8 @@ function showModuleModal(id = null) {
         modalTitle.textContent = '➕ Создание модуля';
         document.getElementById('moduleForm').reset();
         document.getElementById('moduleId').value = '';
+        document.getElementById('modulePreview').value = '';
+        document.getElementById('moduleFileUrl').value = '';
         document.getElementById('previewContainer').innerHTML = '';
         document.getElementById('galleryContainer').innerHTML = '<div class="text-muted p-3 text-center w-100">Нет изображений</div>';
         currentModuleId = null;
@@ -252,6 +606,8 @@ async function saveModule() {
     const title = document.getElementById('moduleTitle').value;
     const description = document.getElementById('moduleDescription').value;
     const version = document.getElementById('moduleVersion').value;
+
+    // Получаем текущие значения из формы (могут быть пустыми)
     let previewImage = document.getElementById('modulePreview')?.value || null;
     let fileUrl = document.getElementById('moduleFileUrl')?.value || null;
 
@@ -264,7 +620,13 @@ async function saveModule() {
     }
 
     try {
-        // Загружаем картинку превью если выбрана
+        let newPreviewImage = null;
+        let newFileUrl = null;
+
+        let hasPreviewChange = false;
+        let hasFileChange = false;
+
+        // Загружаем новую картинку превью если выбрана
         if (previewFile) {
             const formData = new FormData();
             formData.append('file', previewFile);
@@ -274,13 +636,25 @@ async function saveModule() {
                 body: formData
             });
             const uploadData = await uploadRes.json();
-            previewImage = uploadData.url;
-        } else if (previewImage && previewImage.startsWith('/uploads/')) {
-            // Преобразуем относительный путь в полный URL
-            previewImage = `${API_URL}${previewImage}`;
+            newPreviewImage = uploadData.url;
+            hasPreviewChange = true;
+        } else if (previewImage && previewImage.trim() !== '') {
+            // Если есть существующая картинка (не пустая строка и не null)
+            // Преобразуем относительный путь в полный URL для отправки на сервер
+            if (previewImage.startsWith('/uploads/')) {
+                newPreviewImage = `${API_URL}${previewImage}`;
+            } else {
+                newPreviewImage = previewImage;
+            }
+            hasPreviewChange = true;
+        } else {
+            // Если поле пустое и нет файла - значит пользователь явно удалил картинку
+            // Отправляем null, чтобы удалить картинку на сервере
+            newPreviewImage = null;
+            hasPreviewChange = true;
         }
 
-        // Загружаем файл модуля если выбран
+        // Загружаем новый файл модуля если выбран
         if (moduleFile) {
             const formData = new FormData();
             formData.append('file', moduleFile);
@@ -290,19 +664,38 @@ async function saveModule() {
                 body: formData
             });
             const uploadData = await uploadRes.json();
-            fileUrl = uploadData.url;
-        } else if (fileUrl && fileUrl.startsWith('/uploads/')) {
-            // Преобразуем относительный путь в полный URL
-            fileUrl = `${API_URL}${fileUrl}`;
+            newFileUrl = uploadData.url;
+            hasFileChange = true;
+        } else if (fileUrl && fileUrl.trim() !== '') {
+            // Если есть существующий файл
+            if (fileUrl.startsWith('/uploads/')) {
+                newFileUrl = `${API_URL}${fileUrl}`;
+            } else {
+                newFileUrl = fileUrl;
+            }
+            hasFileChange = true;
+        } else {
+            // Если поле пустое и нет файла - отправляем null
+            newFileUrl = null;
+            hasFileChange = true;
         }
 
+        // Формируем объект только с измененными полями
         const data = {
             title,
             description,
-            preview_image: previewImage,
-            file_url: fileUrl,
             current_version: version
         };
+
+        // Добавляем preview_image только если она была изменена
+        if (hasPreviewChange) {
+            data.preview_image = newPreviewImage;
+        }
+
+        // Добавляем file_url только если он был изменен
+        if (hasFileChange) {
+            data.file_url = newFileUrl;
+        }
 
         const url = id ? `${API_URL}/api/admin/modules/${id}` : `${API_URL}/api/admin/modules`;
         const method = id ? 'PUT' : 'POST';
