@@ -2,53 +2,117 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>License Server - Админ панель</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="/css/admin.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Админ-панель | Управление модулями</title>
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <!-- Основные стили -->
+    <% if (isProduction) { %>
+        <link rel="stylesheet" href="/css/admin.min.css">
+    <% } else { %>
+        <link rel="stylesheet" href="/css/admin.css">
+    <% } %>
+
+    <!-- Дополнительные стили для модалок и галереи -->
     <style>
-        /* Дополнительные стили для уведомлений */
-        .alert {
-            padding: 16px;
-            border-radius: 12px;
-            margin-bottom: 20px;
+        /* Базовые стили для модалок, если не загрузились основные */
+        .modal-fullscreen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            backdrop-filter: blur(4px);
         }
-        .alert-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
+        .modal-fullscreen.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .alert-info i {
-            margin-right: 8px;
+        .modal-container {
+            background: #fff;
+            width: 90%;
+            max-width: 1000px;
+            max-height: 85vh;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        .menu-toggle {
+            display: none;
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 1001;
+            background: #4ecdc4;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        @media (max-width: 768px) {
+            .menu-toggle {
+                display: block;
+            }
         }
     </style>
 </head>
 <body>
+
+<!-- Мобильное меню кнопка -->
+<button class="menu-toggle" onclick="toggleSidebar()">
+    <i class="bi bi-list"></i>
+</button>
+
 <!-- Sidebar -->
 <div class="sidebar">
     <div class="sidebar-header">
-        <h3><i class="bi bi-shield-lock"></i><span class="menu-text"> License Server</span></h3>
-        <p class="menu-text">Административная панель</p>
+        <h3>
+            <i class="bi bi-shield-lock-fill"></i>
+            Админ-панель
+        </h3>
+        <p>Управление модулями и лицензиями</p>
     </div>
+
     <div class="sidebar-menu">
-        <a id="menuModules" class="active"><i class="bi bi-grid-3x3-gap-fill"></i><span class="menu-text"> Модули</span></a>
-        <a id="menuLicenses"><i class="bi bi-key-fill"></i><span class="menu-text"> Лицензии</span></a>
-        <a id="menuNews"><i class="bi bi-newspaper"></i><span class="menu-text"> Новости</span></a>
-    </div>
-    <div class="sidebar-divider"></div>
-    <div class="sidebar-menu">
-        <a id="logoutLink"><i class="bi bi-box-arrow-right"></i><span class="menu-text"> Выход</span></a>
+        <a id="menuModules" class="active">
+            <i class="bi bi-grid-3x3-gap-fill"></i>
+            <span>Модули</span>
+        </a>
+        <a id="menuLicenses">
+            <i class="bi bi-key-fill"></i>
+            <span>Лицензии</span>
+        </a>
+        <a id="menuNews">
+            <i class="bi bi-newspaper"></i>
+            <span>Новости</span>
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <a id="logoutLink">
+            <i class="bi bi-box-arrow-right"></i>
+            <span>Выход</span>
+        </a>
     </div>
 </div>
 
 <!-- Main Content -->
-<div class="main-content">
-    <div id="mainContent">
-        <div class="text-center" style="padding: 60px 20px;">
-            <i class="bi bi-shield-check" style="font-size: 64px; color: #4ecdc4;"></i>
-            <h2 style="margin-top: 20px;">Добро пожаловать</h2>
-            <p class="text-muted">Выберите раздел в меню слева</p>
+<div class="main-content" id="mainContent">
+    <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Загрузка...</span>
         </div>
+        <p class="mt-3">Загрузка данных...</p>
     </div>
 </div>
 
@@ -208,6 +272,12 @@
     </div>
 </div>
 
-<script src="/js/admin.js"></script>
+<!-- Скрипты -->
+<% if (isProduction) { %>
+    <script src="/js/admin.min.js"></script>
+<% } else { %>
+    <script src="/js/admin.js"></script>
+<% } %>
+
 </body>
 </html>

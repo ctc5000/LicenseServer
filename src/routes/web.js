@@ -9,7 +9,12 @@ router.get('/admin/login', (req, res) => {
 
 // Админ-панель
 router.get('/admin', (req, res) => {
-    res.render('admin');
+    // Передаем переменные окружения в шаблон
+    res.render('admin', {
+        isProduction: process.env.NODE_ENV === 'production',
+        isDevelopment: process.env.NODE_ENV === 'development',
+        nodeEnv: process.env.NODE_ENV || 'development'
+    });
 });
 
 // Корень - редирект на админку
