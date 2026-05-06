@@ -4,15 +4,23 @@ const path = require('path');
 
 // Страница логина
 router.get('/admin/login', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../public/login.html'));
+    // Для логина используем обычный HTML файл
+    const isProduction = process.env.NODE_ENV === 'production';
+    const publicDir = isProduction
+        ? path.join(__dirname, '../../dist')
+        : path.join(__dirname, '../../public');
+
+    res.sendFile(path.join(publicDir, 'login.html'));
 });
 
 // Админ-панель
 router.get('/admin', (req, res) => {
-    // Передаем переменные окружения в шаблон
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isDevelopment = process.env.NODE_ENV === 'development';
+
     res.render('admin', {
-        isProduction: process.env.NODE_ENV === 'production',
-        isDevelopment: process.env.NODE_ENV === 'development',
+        isProduction: isProduction,
+        isDevelopment: isDevelopment,
         nodeEnv: process.env.NODE_ENV || 'development'
     });
 });

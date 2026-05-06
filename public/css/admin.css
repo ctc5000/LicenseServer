@@ -947,3 +947,415 @@ textarea.form-control {
 .current-file-info .remove-file:hover {
     background: rgba(231, 76, 60, 0.1);
 }
+/* ========== LICENSES PAGE STYLES ========== */
+
+/* Search and filter section */
+.licenses-search-section {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.search-box {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.search-box i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #adb5bd;
+    font-size: 18px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 12px 12px 12px 42px;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: #4ecdc4;
+    box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.1);
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 6px 16px;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+}
+
+.filter-btn:hover {
+    border-color: #4ecdc4;
+    background: #f8f9fa;
+}
+
+.filter-btn.active {
+    background: #4ecdc4;
+    color: white;
+    border-color: #4ecdc4;
+}
+
+/* License Check Card */
+.license-check-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    color: white;
+}
+
+.license-check-card h4 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.license-check-card p {
+    margin: 0 0 16px 0;
+    opacity: 0.9;
+    font-size: 13px;
+}
+
+.check-form {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.check-form input {
+    flex: 2;
+    min-width: 200px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    background: rgba(255,255,255,0.95);
+}
+
+.check-form input:focus {
+    outline: none;
+    background: white;
+}
+
+.check-form button {
+    padding: 12px 24px;
+    background: #ffd700;
+    color: #333;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.check-form button:hover {
+    background: #ffed4a;
+    transform: translateY(-1px);
+}
+
+.check-result {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.15);
+    display: none;
+}
+
+.check-result.show {
+    display: block;
+}
+
+.check-result.valid {
+    background: rgba(39, 174, 96, 0.9);
+}
+
+.check-result.invalid {
+    background: rgba(231, 76, 60, 0.9);
+}
+
+.check-result .result-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.check-result .result-details {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+/* Licenses Table */
+.licenses-table-container {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.licenses-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.licenses-table thead {
+    background: #f8f9fa;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.licenses-table th {
+    padding: 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.licenses-table td {
+    padding: 16px;
+    border-bottom: 1px solid #eef2f6;
+    vertical-align: middle;
+}
+
+.licenses-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.license-key {
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    background: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-block;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-badge i {
+    font-size: 12px;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-expired {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+.status-rejected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 12px;
+}
+
+.action-btn.edit {
+    background: #4ecdc4;
+    color: white;
+}
+
+.action-btn.edit:hover {
+    background: #45b8b0;
+}
+
+.action-btn.delete {
+    background: #e74c3c;
+    color: white;
+}
+
+.action-btn.delete:hover {
+    background: #c0392b;
+}
+
+/* Stats Cards */
+.license-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+}
+
+.stat-info h3 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.stat-info p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #6c757d;
+}
+
+/* Add License Form */
+.add-license-form {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.add-license-form h4 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.form-row .form-group {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: white;
+    border-top: 1px solid #e9ecef;
+}
+
+.pagination-info {
+    font-size: 13px;
+    color: #6c757d;
+}
+
+.pagination-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.page-btn {
+    padding: 6px 12px;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+    background: #4ecdc4;
+    color: white;
+    border-color: #4ecdc4;
+}
+
+.page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .licenses-table-container {
+        overflow-x: auto;
+    }
+
+    .licenses-table {
+        min-width: 600px;
+    }
+
+    .form-row {
+        flex-direction: column;
+    }
+
+    .form-row .form-group {
+        margin-bottom: 12px;
+    }
+
+    .license-stats {
+        grid-template-columns: 1fr 1fr;
+    }
+}

@@ -1,7 +1,13 @@
 const API_URL = window.location.origin;
 let currentModuleId = null;
 let currentGalleryImages = [];
-
+let currentLicenseModuleId = null;
+let allLicenses = [];
+let filteredLicenses = [];
+let currentLicenseFilter = 'all';
+let currentLicenseSearch = '';
+let currentLicensePage = 1;
+const licensesPerPage = 20;
 // Проверка авторизации
 const token = localStorage.getItem('token');
 if (!token && window.location.pathname !== '/admin/login') {
@@ -792,6 +798,19 @@ async function showLicensesList() {
     const modulesRes = await fetch(`${API_URL}/api/admin/modules`, { headers });
     const modules = await modulesRes.json();
 
+    if (modules.length === 0) {
+        document.getElementById('mainContent').innerHTML = `
+            <div class="page-header">
+                <h2><i class="bi bi-key-fill"></i> Управление лицензиями</h2>
+            </div>
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                Нет доступных модулей. Сначала создайте модуль.
+            </div>
+        `;
+        return;
+    }
+
     let html = `
         <div class="page-header">
             <h2><i class="bi bi-key-fill"></i> Управление лицензиями</h2>
@@ -803,11 +822,11 @@ async function showLicensesList() {
                     </button>
                     <div class="dropdown-menu" id="dropdownMenu">
                         ${modules.map(m => `<a href="#" data-module-id="${m.id}" class="module-select">${escapeHtml(m.title)}</a>`).join('')}
-                        ${modules.length === 0 ? '<a href="#" disabled>Нет модулей</a>' : ''}
                     </div>
                 </div>
             </div>
         </div>
+        
         <div id="licensesContent">
             <div class="alert alert-info">
                 <i class="bi bi-info-circle"></i> Выберите модуль для управления лицензиями
@@ -834,155 +853,66 @@ async function showLicensesList() {
         dropdownMenu.querySelectorAll('.module-select').forEach(item => {
             item.addEventListener('click', async (e) => {
                 e.preventDefault();
-                const moduleId = item.dataset.moduleId;
-                dropdownBtn.innerHTML = `<i class="bi bi-folder"></i> ${item.textContent} <i class="bi bi-chevron-down"></i>`;
+                const moduleId = parseInt(item.dataset.moduleId);
+                const moduleName = item.textContent;
+                dropdownBtn.innerHTML = `<i class="bi bi-folder"></i> ${moduleName} <i class="bi bi-chevron-down"></i>`;
                 dropdownMenu.classList.remove('show');
-                await loadLicensesForModule(moduleId);
+                await loadLicensesForModule(moduleId, moduleName);
             });
         });
     }
 }
 
-async function loadLicensesForModule(moduleId) {
-    const moduleRes = await fetch(`${API_URL}/api/admin/modules/${moduleId}`, { headers });
-    const module = await moduleRes.json();
-    const licensesRes = await fetch(`${API_URL}/api/admin/modules/${moduleId}/licenses`, { headers });
-    const licenses = await licensesRes.json();
 
-    let html = `
-        <div class="card">
-            <div class="card-header">
-                <h4>${escapeHtml(module.title)}</h4>
-                <p class="mb-0 text-muted">Управление лицензиями</p>
+async function loadLicensesForModule(moduleId, moduleName) {
+    currentLicenseModuleId = moduleId;
+    currentLicensePage = 1;
+    currentLicenseFilter = 'all';
+    currentLicenseSearch = '';
+
+    try {
+        // Получаем информацию о модуле
+        const moduleRes = await fetch(`${API_URL}/api/admin/modules/${moduleId}`, { headers });
+        const module = await moduleRes.json();
+
+        // Получаем лицензии
+        const licensesRes = await fetch(`${API_URL}/api/admin/modules/${moduleId}/licenses`, { headers });
+        const licenses = await licensesRes.json();
+
+        allLicenses = licenses;
+        filteredLicenses = [...allLicenses];
+        applyLicensesFilters();
+
+        renderLicensesPage(module);
+    } catch (err) {
+        console.error('Error loading licenses:', err);
+        document.getElementById('licensesContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                Ошибка загрузки лицензий: ${err.message}
             </div>
-            <div class="card-body">
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <h5>➕ Добавить лицензию</h5>
-                        <div class="input-group">
-                            <input type="text" id="newLicenseKey" class="form-control" placeholder="Серийный номер">
-                            <select id="newLicenseStatus" class="form-select" style="width: 130px;">
-                                <option value="active">Активна</option>
-                                <option value="inactive">Неактивна</option>
-                                <option value="pending">Ожидание</option>
-                                <option value="expired">Просрочена</option>
-                                <option value="rejected">Отклонена</option>
-                            </select>
-                            <button class="btn btn-primary" id="addLicenseBtn">Добавить</button>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <h5>📄 Массовый импорт</h5>
-                        <div class="input-group">
-                            <input type="file" id="csvFile" class="form-control" accept=".csv,.txt">
-                            <button class="btn btn-secondary" id="importCsvBtn">Импорт CSV</button>
-                        </div>
-                        <small class="text-muted">Формат: каждая строка - серийный номер</small>
-                    </div>
-                </div>
-                
-                <h5>Список лицензий (${licenses.length})</h5>
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr><th>Серийный номер</th><th>Статус</th><th>Дата создания</th><th>Истекает</th><th>Действия</th></tr>
-                        </thead>
-                        <tbody>
-    `;
-
-    licenses.forEach(lic => {
-        html += `
-            <tr>
-                <td><code>${escapeHtml(lic.license_key)}</code></td>
-                <td>
-                    <select class="form-select form-select-sm license-status" data-id="${lic.id}" style="width: 130px;">
-                        <option value="active" ${lic.status === 'active' ? 'selected' : ''}>🟢 Активна</option>
-                        <option value="inactive" ${lic.status === 'inactive' ? 'selected' : ''}>🔴 Неактивна</option>
-                        <option value="pending" ${lic.status === 'pending' ? 'selected' : ''}>🟡 Ожидание</option>
-                        <option value="expired" ${lic.status === 'expired' ? 'selected' : ''}>⚫ Просрочена</option>
-                        <option value="rejected" ${lic.status === 'rejected' ? 'selected' : ''}>🔴 Отклонена</option>
-                    </select>
-                </td>
-                <td>${new Date(lic.created_at).toLocaleDateString()}</td>
-                <td><input type="date" class="form-control form-control-sm license-expires" data-id="${lic.id}" value="${lic.expires_at || ''}" style="width: 130px;"></td>
-                <td><button class="btn btn-sm btn-danger delete-license-btn" data-id="${lic.id}"><i class="bi bi-trash"></i></button></td>
-            </tr>
         `;
-    });
-
-    html += `
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.getElementById('licensesContent').innerHTML = html;
-
-    document.getElementById('addLicenseBtn')?.addEventListener('click', async () => {
-        const key = document.getElementById('newLicenseKey').value;
-        const status = document.getElementById('newLicenseStatus').value;
-        if (!key) return;
-
-        await fetch(`${API_URL}/api/admin/licenses`, {
-            method: 'POST',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ module_id: moduleId, license_key: key, status })
-        });
-
-        document.getElementById('newLicenseKey').value = '';
-        loadLicensesForModule(moduleId);
-    });
-
-    document.getElementById('importCsvBtn')?.addEventListener('click', async () => {
-        const file = document.getElementById('csvFile').files[0];
-        if (!file) return;
-
-        const text = await file.text();
-        const lines = text.split(/\r?\n/).filter(l => l.trim());
-        const licenses = lines.map(l => l.trim());
-
-        await fetch(`${API_URL}/api/admin/licenses/bulk`, {
-            method: 'POST',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ module_id: moduleId, licenses })
-        });
-
-        loadLicensesForModule(moduleId);
-        document.getElementById('csvFile').value = '';
-    });
-
-    document.querySelectorAll('.license-status').forEach(select => {
-        select.addEventListener('change', async () => {
-            await fetch(`${API_URL}/api/admin/licenses/${select.dataset.id}`, {
-                method: 'PUT',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: select.value })
-            });
-        });
-    });
-
-    document.querySelectorAll('.license-expires').forEach(input => {
-        input.addEventListener('change', async () => {
-            await fetch(`${API_URL}/api/admin/licenses/${input.dataset.id}`, {
-                method: 'PUT',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ expires_at: input.value || null })
-            });
-        });
-    });
-
-    document.querySelectorAll('.delete-license-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            if (confirm('Удалить лицензию?')) {
-                await fetch(`${API_URL}/api/admin/licenses/${btn.dataset.id}`, { method: 'DELETE', headers });
-                loadLicensesForModule(moduleId);
-            }
-        });
-    });
+    }
 }
 
+function applyLicensesFilters() {
+    let filtered = [...allLicenses];
+
+    // Фильтр по статусу
+    if (currentLicenseFilter !== 'all') {
+        filtered = filtered.filter(lic => lic.status === currentLicenseFilter);
+    }
+
+    // Поиск по ключу
+    if (currentLicenseSearch) {
+        const searchLower = currentLicenseSearch.toLowerCase();
+        filtered = filtered.filter(lic =>
+            lic.license_key.toLowerCase().includes(searchLower)
+        );
+    }
+
+    filteredLicenses = filtered;
+}
 // ============ НОВОСТИ ============
 async function showNewsList() {
     setActiveMenu('menuNews');
@@ -1060,7 +990,459 @@ async function showNewsList() {
     });
 }
 
+function renderLicensesPage(module) {
+    // Расчет пагинации
+    const totalPages = Math.ceil(filteredLicenses.length / licensesPerPage);
+    const startIndex = (currentLicensePage - 1) * licensesPerPage;
+    const endIndex = startIndex + licensesPerPage;
+    const pageLicenses = filteredLicenses.slice(startIndex, endIndex);
 
+    // Статистика
+    const stats = {
+        total: allLicenses.length,
+        active: allLicenses.filter(l => l.status === 'active').length,
+        inactive: allLicenses.filter(l => l.status === 'inactive').length,
+        pending: allLicenses.filter(l => l.status === 'pending').length,
+        expired: allLicenses.filter(l => l.status === 'expired').length
+    };
+
+    let html = `
+        <!-- Stats Cards -->
+        <div class="license-stats">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="bi bi-key"></i></div>
+                <div class="stat-info">
+                    <h3>${stats.total}</h3>
+                    <p>Всего лицензий</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #27ae60, #2ecc71);"><i class="bi bi-check-circle"></i></div>
+                <div class="stat-info">
+                    <h3>${stats.active}</h3>
+                    <p>Активных</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #e74c3c, #c0392b);"><i class="bi bi-x-circle"></i></div>
+                <div class="stat-info">
+                    <h3>${stats.inactive + stats.expired}</h3>
+                    <p>Неактивных</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f39c12, #e67e22);"><i class="bi bi-clock"></i></div>
+                <div class="stat-info">
+                    <h3>${stats.pending}</h3>
+                    <p>В ожидании</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- License Check Card -->
+        <div class="license-check-card">
+            <h4><i class="bi bi-shield-check"></i> Проверка лицензии</h4>
+            <p>Введите ключ лицензии для проверки статуса и информации о модуле</p>
+            <div class="check-form">
+                <input type="text" id="checkLicenseKey" placeholder="Введите серийный номер лицензии" autocomplete="off">
+                <button id="checkLicenseBtn"><i class="bi bi-search"></i> Проверить</button>
+            </div>
+            <div id="checkResult" class="check-result"></div>
+        </div>
+        
+        <!-- Add License Form -->
+        <div class="add-license-form">
+            <h4><i class="bi bi-plus-circle"></i> Добавить новую лицензию</h4>
+            <div class="form-row">
+                <div class="form-group" style="flex: 2;">
+                    <input type="text" id="newLicenseKey" class="form-control" placeholder="Серийный номер">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <select id="newLicenseStatus" class="form-control">
+                        <option value="active">🟢 Активна</option>
+                        <option value="inactive">🔴 Неактивна</option>
+                        <option value="pending">🟡 Ожидание</option>
+                        <option value="expired">⚫ Просрочена</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <input type="date" id="newLicenseExpires" class="form-control" placeholder="Дата истечения">
+                </div>
+                <button class="btn btn-primary" id="addLicenseBtn">
+                    <i class="bi bi-plus-lg"></i> Добавить
+                </button>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="bi bi-upload"></i> Массовый импорт: 
+                    <input type="file" id="csvFile" accept=".csv,.txt" style="display: inline-block; width: auto;">
+                    <button class="btn btn-sm btn-secondary" id="importCsvBtn">Импорт CSV</button>
+                </small>
+            </div>
+        </div>
+        
+        <!-- Search and Filter -->
+        <div class="licenses-search-section">
+            <div class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" id="licenseSearch" placeholder="Поиск по серийному номеру..." autocomplete="off">
+            </div>
+            <div class="filter-buttons">
+                <button class="filter-btn ${currentLicenseFilter === 'all' ? 'active' : ''}" data-filter="all">
+                    Все (${stats.total})
+                </button>
+                <button class="filter-btn ${currentLicenseFilter === 'active' ? 'active' : ''}" data-filter="active">
+                    🟢 Активные (${stats.active})
+                </button>
+                <button class="filter-btn ${currentLicenseFilter === 'inactive' ? 'active' : ''}" data-filter="inactive">
+                    🔴 Неактивные (${stats.inactive})
+                </button>
+                <button class="filter-btn ${currentLicenseFilter === 'pending' ? 'active' : ''}" data-filter="pending">
+                    🟡 Ожидание (${stats.pending})
+                </button>
+                <button class="filter-btn ${currentLicenseFilter === 'expired' ? 'active' : ''}" data-filter="expired">
+                    ⚫ Просроченные (${stats.expired})
+                </button>
+            </div>
+        </div>
+        
+        <!-- Licenses Table -->
+        <div class="licenses-table-container">
+            <table class="licenses-table">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>Серийный номер</th>
+                        <th>Статус</th>
+                        <th>Дата создания</th>
+                        <th>Истекает</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    if (pageLicenses.length === 0) {
+        html += `
+            <tr>
+                <td colspan="6" class="text-center p-5">
+                    <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
+                    <p class="mt-2 text-muted">Лицензии не найдены</p>
+                </td>
+            </tr>
+        `;
+    } else {
+        pageLicenses.forEach((lic, index) => {
+            const globalIndex = startIndex + index + 1;
+            const statusIcon = {
+                'active': '🟢',
+                'inactive': '🔴',
+                'pending': '🟡',
+                'expired': '⚫',
+                'rejected': '🔴'
+            }[lic.status] || '⚪';
+
+            html += `
+                <tr>
+                    <td>${globalIndex}</td>
+                    <td>
+                        <code class="license-key">${escapeHtml(lic.license_key)}</code>
+                    </td>
+                    <td>
+                        <span class="status-badge status-${lic.status}">
+                            <i class="bi bi-circle-fill"></i>
+                            ${statusIcon} ${getStatusText(lic.status)}
+                        </span>
+                    </td>
+                    <td><small>${new Date(lic.created_at).toLocaleDateString()}</small></td>
+                    <td>
+                        <input type="date" class="form-control form-control-sm license-expires" 
+                               data-id="${lic.id}" value="${lic.expires_at || ''}" 
+                               style="width: 130px; display: inline-block;">
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <select class="form-select form-select-sm license-status" data-id="${lic.id}" style="width: 110px;">
+                                <option value="active" ${lic.status === 'active' ? 'selected' : ''}>🟢 Активна</option>
+                                <option value="inactive" ${lic.status === 'inactive' ? 'selected' : ''}>🔴 Неактивна</option>
+                                <option value="pending" ${lic.status === 'pending' ? 'selected' : ''}>🟡 Ожидание</option>
+                                <option value="expired" ${lic.status === 'expired' ? 'selected' : ''}>⚫ Просрочена</option>
+                                <option value="rejected" ${lic.status === 'rejected' ? 'selected' : ''}>🔴 Отклонена</option>
+                            </select>
+                            <button class="action-btn delete" onclick="deleteLicense(${lic.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    html += `
+                </tbody>
+            </table>
+            
+            <!-- Pagination -->
+            <div class="pagination">
+                <div class="pagination-info">
+                    Показано ${startIndex + 1}-${Math.min(endIndex, filteredLicenses.length)} из ${filteredLicenses.length} лицензий
+                </div>
+                <div class="pagination-buttons">
+                    <button class="page-btn" id="prevPageBtn" ${currentLicensePage === 1 ? 'disabled' : ''}>
+                        <i class="bi bi-chevron-left"></i> Назад
+                    </button>
+                    <span class="pagination-info" style="margin: 0 12px;">
+                        Страница ${currentLicensePage} из ${totalPages || 1}
+                    </span>
+                    <button class="page-btn" id="nextPageBtn" ${currentLicensePage === totalPages || totalPages === 0 ? 'disabled' : ''}>
+                        Вперед <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('licensesContent').innerHTML = html;
+
+    // Инициализация обработчиков
+    initializeLicenseHandlers(module);
+}
+function getStatusText(status) {
+    const statusMap = {
+        'active': 'Активна',
+        'inactive': 'Неактивна',
+        'pending': 'Ожидание',
+        'expired': 'Просрочена',
+        'rejected': 'Отклонена'
+    };
+    return statusMap[status] || status;
+}
+function initializeLicenseHandlers(module) {
+    // Поиск
+    const searchInput = document.getElementById('licenseSearch');
+    if (searchInput) {
+        searchInput.value = currentLicenseSearch;
+        searchInput.addEventListener('input', (e) => {
+            currentLicenseSearch = e.target.value;
+            currentLicensePage = 1;
+            applyLicensesFilters();
+            renderLicensesPage(module);
+        });
+    }
+
+    // Фильтры
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentLicenseFilter = btn.dataset.filter;
+            currentLicensePage = 1;
+            applyLicensesFilters();
+            renderLicensesPage(module);
+        });
+    });
+
+    // Пагинация
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentLicensePage > 1) {
+                currentLicensePage--;
+                renderLicensesPage(module);
+            }
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredLicenses.length / licensesPerPage);
+            if (currentLicensePage < totalPages) {
+                currentLicensePage++;
+                renderLicensesPage(module);
+            }
+        });
+    }
+
+    // Добавление лицензии
+    const addBtn = document.getElementById('addLicenseBtn');
+    if (addBtn) {
+        addBtn.onclick = async () => {
+            const key = document.getElementById('newLicenseKey').value;
+            const status = document.getElementById('newLicenseStatus').value;
+            const expiresAt = document.getElementById('newLicenseExpires').value;
+
+            if (!key) {
+                showNotification('Введите серийный номер', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/licenses`, {
+                    method: 'POST',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        module_id: currentLicenseModuleId,
+                        license_key: key,
+                        status,
+                        expires_at: expiresAt || null
+                    })
+                });
+
+                if (response.ok) {
+                    showNotification('Лицензия добавлена', 'success');
+                    document.getElementById('newLicenseKey').value = '';
+                    document.getElementById('newLicenseExpires').value = '';
+                    await loadLicensesForModule(currentLicenseModuleId, module.title);
+                } else {
+                    const err = await response.json();
+                    showNotification(err.error || 'Ошибка добавления', 'error');
+                }
+            } catch (err) {
+                showNotification('Ошибка соединения', 'error');
+            }
+        };
+    }
+
+    // Изменение статуса
+    document.querySelectorAll('.license-status').forEach(select => {
+        select.addEventListener('change', async () => {
+            try {
+                await fetch(`${API_URL}/api/admin/licenses/${select.dataset.id}`, {
+                    method: 'PUT',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: select.value })
+                });
+                showNotification('Статус обновлен', 'success');
+                await loadLicensesForModule(currentLicenseModuleId, module.title);
+            } catch (err) {
+                showNotification('Ошибка обновления', 'error');
+            }
+        });
+    });
+
+    // Изменение даты истечения
+    document.querySelectorAll('.license-expires').forEach(input => {
+        input.addEventListener('change', async () => {
+            try {
+                await fetch(`${API_URL}/api/admin/licenses/${input.dataset.id}`, {
+                    method: 'PUT',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ expires_at: input.value || null })
+                });
+                showNotification('Дата обновлена', 'success');
+            } catch (err) {
+                showNotification('Ошибка обновления', 'error');
+            }
+        });
+    });
+
+    // Проверка лицензии
+    const checkBtn = document.getElementById('checkLicenseBtn');
+    const checkInput = document.getElementById('checkLicenseKey');
+
+    if (checkBtn && checkInput) {
+        checkBtn.onclick = async () => {
+            const licenseKey = checkInput.value.trim();
+            if (!licenseKey) {
+                showNotification('Введите ключ лицензии', 'error');
+                return;
+            }
+
+            const resultDiv = document.getElementById('checkResult');
+            resultDiv.innerHTML = '<div class="text-center"><i class="bi bi-hourglass-split"></i> Проверка...</div>';
+            resultDiv.classList.add('show');
+
+            try {
+                const response = await fetch(`${API_URL}/api/license/check-exists-any?license=${encodeURIComponent(licenseKey)}`);
+                const data = await response.json();
+
+                if (data.valid) {
+                    resultDiv.className = 'check-result show valid';
+                    resultDiv.innerHTML = `
+                        <div class="result-title">
+                            <i class="bi bi-check-circle-fill"></i>
+                            Лицензия действительна!
+                        </div>
+                        <div class="result-details">
+                            <strong>Модуль:</strong> ${data.module?.module_title || '—'}<br>
+                            <strong>Статус:</strong> ${getStatusText(data.status)}<br>
+                            ${data.module?.expires_at ? `<strong>Истекает:</strong> ${new Date(data.module.expires_at).toLocaleDateString()}<br>` : ''}
+                            <strong>Версия модуля:</strong> ${data.module?.current_version || '—'}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.className = 'check-result show invalid';
+                    let errorMessage = 'Лицензия недействительна';
+                    if (data.status === 'expired') errorMessage = 'Срок действия лицензии истек';
+                    if (data.status === 'inactive') errorMessage = 'Лицензия деактивирована';
+                    if (!data.exists) errorMessage = 'Лицензия не найдена';
+
+                    resultDiv.innerHTML = `
+                        <div class="result-title">
+                            <i class="bi bi-x-circle-fill"></i>
+                            ${errorMessage}
+                        </div>
+                        <div class="result-details">
+                            ${data.module ? `<strong>Модуль:</strong> ${data.module.module_title}<br>` : ''}
+                            <strong>Статус:</strong> ${data.status || 'not_found'}
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                resultDiv.className = 'check-result show invalid';
+                resultDiv.innerHTML = `
+                    <div class="result-title">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        Ошибка проверки
+                    </div>
+                    <div class="result-details">${err.message}</div>
+                `;
+            }
+        };
+
+        checkInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkBtn.click();
+        });
+    }
+
+    // Импорт CSV
+    const importBtn = document.getElementById('importCsvBtn');
+    const csvFile = document.getElementById('csvFile');
+
+    if (importBtn && csvFile) {
+        importBtn.onclick = async () => {
+            const file = csvFile.files[0];
+            if (!file) {
+                showNotification('Выберите файл CSV', 'error');
+                return;
+            }
+
+            const text = await file.text();
+            const lines = text.split(/\r?\n/).filter(l => l.trim());
+            const licenses = lines.map(l => l.trim());
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/licenses/bulk`, {
+                    method: 'POST',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ module_id: currentLicenseModuleId, licenses })
+                });
+
+                if (response.ok) {
+                    showNotification(`Импортировано ${licenses.length} лицензий`, 'success');
+                    csvFile.value = '';
+                    await loadLicensesForModule(currentLicenseModuleId, module.title);
+                } else {
+                    const err = await response.json();
+                    showNotification(err.error || 'Ошибка импорта', 'error');
+                }
+            } catch (err) {
+                showNotification('Ошибка импорта', 'error');
+            }
+        };
+    }
+}
 function showNewsModal(id = null) {
     const modal = document.getElementById('newsModal');
     const modalTitle = document.getElementById('newsModalTitle');

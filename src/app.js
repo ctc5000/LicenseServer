@@ -24,12 +24,18 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Определяем окружение
+const isProduction = process.env.NODE_ENV === 'production';
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 // Создаем папку uploads если её нет
 const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
     console.log('📁 Created uploads directory:', uploadsDir);
 }
+
+// Настройки Helmet
 app.use(
     helmet({
         contentSecurityPolicy: false,
@@ -42,14 +48,51 @@ app.use(cors());
 app.use(express.json({ limit: '3000mb' }));
 app.use(express.urlencoded({ extended: true, limit: '3000mb' }));
 
-// Статика - ПРАВИЛЬНЫЙ ПУТЬ к uploads
-
+// ============ СТАТИЧЕСКИЕ ФАЙЛЫ ============
+// Папка uploads всегда доступна
 app.use('/uploads', express.static(uploadsDir));
-app.use(express.static(path.join(__dirname, '../public')));
+
+// В продакшене используем минифицированные файлы из dist
+if (isProduction) {
+    const distDir = path.join(__dirname, '../dist');
+    if (fs.existsSync(distDir)) {
+        // Раздача минифицированных файлов
+        app.use('/css', express.static(path.join(distDir, 'css')));
+        app.use('/js', express.static(path.join(distDir, 'js')));
+        app.use(express.static(distDir));
+        console.log('📦 Production mode: serving minified files from dist');
+    } else {
+        console.warn('⚠️ dist directory not found, run `npm run build` first');
+        // Fallback на public если dist нет
+        app.use(express.static(path.join(__dirname, '../public')));
+    }
+}
+
+// В разработке используем исходники из public
+if (isDevelopment) {
+    app.use('/css', express.static(path.join(__dirname, '../public/css')));
+    app.use('/js', express.static(path.join(__dirname, '../public/js')));
+    app.use(express.static(path.join(__dirname, '../public')));
+    console.log('🛠️ Development mode: serving source files from public');
+}
+
+// Если окружение не определено, используем public
+if (!isProduction && !isDevelopment) {
+    app.use(express.static(path.join(__dirname, '../public')));
+}
 
 // View engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
+
+// Передаем переменные окружения во все шаблоны
+app.use((req, res, next) => {
+    res.locals.isProduction = isProduction;
+    res.locals.isDevelopment = isDevelopment;
+    res.locals.nodeEnv = process.env.NODE_ENV || 'development';
+    res.locals.baseUrl = `${req.protocol}://${req.get('host')}`;
+    next();
+});
 
 // Rate limiting
 app.use('/api', apiLimiter);
@@ -69,12 +112,14 @@ app.get('/health', async (req, res) => {
         res.json({
             status: 'ok',
             database: 'connected',
+            environment: process.env.NODE_ENV || 'development',
             timestamp: new Date().toISOString()
         });
     } catch (error) {
         res.status(503).json({
             status: 'error',
             database: 'disconnected',
+            environment: process.env.NODE_ENV || 'development',
             timestamp: new Date().toISOString()
         });
     }
@@ -82,24 +127,33 @@ app.get('/health', async (req, res) => {
 
 // Error handler
 app.use(errorHandler);
+
 // Sync database and start server
 const startServer = async () => {
     try {
         await db.sequelize.authenticate();
         console.log('✅ Database connected successfully');
 
-        if (process.env.NODE_ENV === 'development') {
+        if (isDevelopment) {
             await db.sequelize.sync();
             console.log('📦 Database synced');
         }
 
         app.listen(PORT, () => {
-            console.log(`🚀 Server running on http://localhost:${PORT}`);
+            console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+            console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
             console.log(`📚 Swagger UI: http://localhost:${PORT}/api-docs`);
             console.log(`🔐 Admin panel: http://localhost:${PORT}/admin`);
-            console.log(`👤 Admin panel ready`);
             console.log(`📁 Uploads directory: ${uploadsDir}`);
-            console.log(`📁 Static URL: http://localhost:${PORT}/uploads/`);
+
+            if (isProduction) {
+                console.log(`📦 Minified assets: http://localhost:${PORT}/css/admin.min.css`);
+                console.log(`📦 Minified JS: http://localhost:${PORT}/js/main.min.js`);
+            } else {
+                console.log(`🛠️ Source CSS: http://localhost:${PORT}/css/admin.css`);
+                console.log(`🛠️ Source JS: http://localhost:${PORT}/js/main.js`);
+            }
+            console.log('');
         });
     } catch (error) {
         console.error('❌ Database connection failed:', error);

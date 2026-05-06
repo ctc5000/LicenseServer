@@ -198,19 +198,24 @@ const updateLicense = async (req, res, next) => {
     }
 };
 
-const deleteLicense = async (req, res, next) => {
-    try {
-        const license = await db.License.findByPk(req.params.id);
-        if (!license) {
-            return res.status(404).json({ error: 'Лицензия не найдена' });
-        }
+async function deleteLicense(licenseId) {
+    const confirmed = await showConfirmDialog('Удалить лицензию?', 'Это действие нельзя отменить.');
+    if (!confirmed) return;
 
-        await license.destroy();
-        res.status(204).send();
+    try {
+        await fetch(`${API_URL}/api/admin/licenses/${licenseId}`, { method: 'DELETE', headers });
+        showNotification('Лицензия удалена', 'success');
+
+        // Перезагружаем текущую страницу
+        if (currentLicenseModuleId) {
+            const moduleRes = await fetch(`${API_URL}/api/admin/modules/${currentLicenseModuleId}`, { headers });
+            const module = await moduleRes.json();
+            await loadLicensesForModule(currentLicenseModuleId, module.title);
+        }
     } catch (err) {
-        next(err);
+        showNotification('Ошибка удаления', 'error');
     }
-};
+}
 
 const bulkCreateLicenses = async (req, res, next) => {
     try {

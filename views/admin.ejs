@@ -194,11 +194,11 @@
                         <div class="upload-zone" id="uploadZone">
                             <i class="bi bi-cloud-upload"></i>
                             <p>Перетащите изображения сюда или нажмите для выбора</p>
-                            <button type="button" class="btn-upload" onclick="document.getElementById('galleryImageInput').click()">
+                            <button type="button" class="btn-upload" id="galleryUploadBtn">
                                 <i class="bi bi-plus"></i> Выбрать файлы
                             </button>
-                            <input type="file" id="galleryImageInput" multiple accept="image/*" style="display: none;">
                         </div>
+                        <input type="file" id="galleryImageInput" multiple accept="image/*" style="display: none;">
                     </div>
                     <div class="gallery-container" id="galleryContainer">
                         <div class="empty-gallery">
@@ -272,12 +272,10 @@
     </div>
 </div>
 
-<!-- Скрипты -->
 <% if (isProduction) { %>
-    <script src="/js/admin.min.js"></script>
+    <script type="module" src="/js/main.min.js"></script>
 <% } else { %>
-    <script src="/js/admin.js"></script>
+    <script type="module" src="/js/main.js"></script>
 <% } %>
-
 </body>
 </html>
