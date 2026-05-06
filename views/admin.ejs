@@ -87,15 +87,38 @@
                     <div class="col-6">
                         <div class="form-group">
                             <label class="form-label">Превью изображение</label>
-                            <input type="file" id="previewImageFile" class="form-control" accept="image/*">
+                            <div class="custom-file-input">
+                                <div class="file-input-wrapper">
+                                    <input type="file" id="previewImageFile" accept="image/*">
+                                    <label for="previewImageFile" class="file-input-label">
+                                        <i class="bi bi-image"></i>
+                                        <span class="file-name">Выберите изображение...</span>
+                                        <span class="btn-browse">Обзор</span>
+                                    </label>
+                                </div>
+                            </div>
                             <input type="hidden" id="modulePreview">
-                            <div id="previewContainer" class="mt-2"></div>
+                            <div id="previewContainer" class="preview-container">
+                                <div class="preview-placeholder">
+                                    <i class="bi bi-image"></i>
+                                    <p>Нет изображения</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="form-group">
                             <label class="form-label">Файл модуля</label>
-                            <input type="file" id="moduleFile" class="form-control">
+                            <div class="custom-file-input">
+                                <div class="file-input-wrapper">
+                                    <input type="file" id="moduleFile">
+                                    <label for="moduleFile" class="file-input-label">
+                                        <i class="bi bi-file-zip"></i>
+                                        <span class="file-name">Выберите файл...</span>
+                                        <span class="btn-browse">Обзор</span>
+                                    </label>
+                                </div>
+                            </div>
                             <input type="hidden" id="moduleFileUrl">
                         </div>
                     </div>
@@ -129,40 +152,58 @@
     </div>
 </div>
 
-<!-- Modal для новости -->
-<div class="modal-fullscreen" id="newsModal">
-    <div class="modal-container" style="max-width: 700px;">
+<!-- Modal for News -->
+<div id="newsModal" class="modal-fullscreen" style="display: none;">
+    <div class="modal-container">
         <div class="modal-header">
-            <h3 id="newsModalTitle">Добавить новость</h3>
-            <button class="close-btn" id="closeNewsModalBtn">&times;</button>
+            <h3 id="newsModalTitle">Новость</h3>
+            <button type="button" class="close-btn" id="closeNewsModalBtn">&times;</button>
         </div>
         <div class="modal-body">
             <form id="newsForm">
                 <input type="hidden" id="newsId">
-                <div class="form-group">
-                    <label class="form-label">Модуль</label>
-                    <select id="newsModuleId" class="form-control">
-                        <option value="">-- Все модули --</option>
-                    </select>
-                </div>
+
                 <div class="form-group">
                     <label class="form-label">Заголовок *</label>
                     <input type="text" id="newsTitle" class="form-control" required>
                 </div>
+
                 <div class="form-group">
-                    <label class="form-label">Картинка</label>
-                    <input type="file" id="newsImageFile" class="form-control" accept="image/*">
-                    <div id="newsPreviewContainer" class="mt-2"></div>
+                    <label class="form-label">Модуль (опционально)</label>
+                    <select id="newsModuleId" class="form-control">
+                        <option value="">-- Все модули (общая новость) --</option>
+                    </select>
                 </div>
+
                 <div class="form-group">
-                    <label class="form-label">Текст *</label>
+                    <label class="form-label">Изображение</label>
+                    <div class="custom-file-input">
+                        <div class="file-input-wrapper">
+                            <input type="file" id="newsImageFile" accept="image/*">
+                            <label for="newsImageFile" class="file-input-label" id="newsImageLabel">
+                                <i class="bi bi-image"></i>
+                                <span class="file-name">Выберите изображение...</span>
+                                <span class="btn-browse">Обзор</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div id="newsPreviewContainer" class="preview-container">
+                        <div class="preview-placeholder">
+                            <i class="bi bi-image"></i>
+                            <p>Нет изображения</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Содержание *</label>
                     <textarea id="newsContent" class="form-control" rows="8" required></textarea>
                 </div>
             </form>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" id="cancelNewsModalBtn">Отмена</button>
-            <button class="btn btn-primary" id="saveNewsBtn">Сохранить</button>
+            <button type="button" class="btn btn-secondary" id="cancelNewsModalBtn">Отмена</button>
+            <button type="button" class="btn btn-primary" id="saveNewsBtn">Сохранить</button>
         </div>
     </div>
 </div>

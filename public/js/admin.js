@@ -519,10 +519,11 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
-const originalShowModuleModal = showModuleModal;
+const originalShowModuleModal = window.showModuleModal || showModuleModal;
 window.showModuleModal = function(id = null) {
     originalShowModuleModal(id);
     setTimeout(() => {
+        initStyledFileInputs();
         initUploadZone();
     }, 100);
 };
@@ -1077,6 +1078,13 @@ function showNewsModal(id = null) {
             }
         });
 
+    // Сброс превью и имени файла
+    const newsImageLabel = document.getElementById('newsImageLabel');
+    if (newsImageLabel) {
+        const fileNameSpan = newsImageLabel.querySelector('.file-name');
+        if (fileNameSpan) fileNameSpan.textContent = 'Выберите изображение...';
+    }
+
     if (id) {
         modalTitle.textContent = '✏️ Редактирование новости';
         fetch(`${API_URL}/api/admin/news/${id}`, { headers })
@@ -1089,21 +1097,165 @@ function showNewsModal(id = null) {
 
                 if (news.image_url) {
                     const imgUrl = news.image_url.startsWith('http') ? news.image_url : `${API_URL}${news.image_url}`;
-                    document.getElementById('newsPreviewContainer').innerHTML = `<img src="${imgUrl}" class="preview-image">`;
+                    const container = document.getElementById('newsPreviewContainer');
+                    if (container) {
+                        container.innerHTML = `
+                            <div style="position: relative; display: inline-block;">
+                                <img src="${imgUrl}" class="preview-image">
+                                <button type="button" class="remove-image-btn" onclick="removeNewsImage()" 
+                                        style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; 
+                                               border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer;
+                                               display: flex; align-items: center; justify-content: center;">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+
+                    // Обновляем лейбл с именем файла (если есть)
+                    if (news.image_url) {
+                        const fileName = news.image_url.split('/').pop();
+                        if (newsImageLabel) {
+                            const fileNameSpan = newsImageLabel.querySelector('.file-name');
+                            if (fileNameSpan) fileNameSpan.textContent = fileName;
+                        }
+                    }
                 } else {
-                    document.getElementById('newsPreviewContainer').innerHTML = '';
+                    const container = document.getElementById('newsPreviewContainer');
+                    if (container) {
+                        container.innerHTML = `
+                            <div class="preview-placeholder">
+                                <i class="bi bi-image"></i>
+                                <p>Нет изображения</p>
+                            </div>
+                        `;
+                    }
                 }
             });
     } else {
         modalTitle.textContent = '➕ Добавить новость';
         document.getElementById('newsForm').reset();
         document.getElementById('newsId').value = '';
-        document.getElementById('newsPreviewContainer').innerHTML = '';
+        document.getElementById('newsModuleId').value = '';
+
+        const container = document.getElementById('newsPreviewContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="preview-placeholder">
+                    <i class="bi bi-image"></i>
+                    <p>Нет изображения</p>
+                </div>
+            `;
+        }
     }
 
     modal.classList.add('show');
     modal.style.display = 'flex';
+
+    // Инициализируем стилизованные инпуты после открытия модалки
+    setTimeout(() => {
+        initStyledFileInputs();
+    }, 100);
 }
+function initStyledFileInputs() {
+    // Для превью изображения модуля
+    const previewInput = document.getElementById('previewImageFile');
+    if (previewInput) {
+        const label = document.querySelector('label[for="previewImageFile"]');
+        if (label) {
+            const fileNameSpan = label.querySelector('.file-name');
+            previewInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file && fileNameSpan) {
+                    fileNameSpan.textContent = file.name;
+                } else if (fileNameSpan) {
+                    fileNameSpan.textContent = 'Выберите изображение...';
+                }
+
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const container = document.getElementById('previewContainer');
+                        if (container) {
+                            container.innerHTML = `<img src="${event.target.result}" class="preview-image">`;
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+    }
+
+    // Для файла модуля
+    const moduleFileInput = document.getElementById('moduleFile');
+    if (moduleFileInput) {
+        const label = document.querySelector('label[for="moduleFile"]');
+        if (label) {
+            const fileNameSpan = label.querySelector('.file-name');
+            moduleFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file && fileNameSpan) {
+                    fileNameSpan.textContent = file.name;
+                } else if (fileNameSpan) {
+                    fileNameSpan.textContent = 'Выберите файл...';
+                }
+            });
+        }
+    }
+
+    // Для изображения новости
+    const newsImageInput = document.getElementById('newsImageFile');
+    if (newsImageInput) {
+        const label = document.getElementById('newsImageLabel');
+        if (label) {
+            const fileNameSpan = label.querySelector('.file-name');
+            newsImageInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file && fileNameSpan) {
+                    fileNameSpan.textContent = file.name;
+                } else if (fileNameSpan) {
+                    fileNameSpan.textContent = 'Выберите изображение...';
+                }
+
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const container = document.getElementById('newsPreviewContainer');
+                        if (container) {
+                            container.innerHTML = `<img src="${event.target.result}" class="preview-image">`;
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+    }
+}
+function removeNewsImage() {
+    const container = document.getElementById('newsPreviewContainer');
+    if (container) {
+        container.innerHTML = `
+            <div class="preview-placeholder">
+                <i class="bi bi-image"></i>
+                <p>Нет изображения</p>
+            </div>
+        `;
+    }
+
+    // Сбрасываем input файла
+    const imageInput = document.getElementById('newsImageFile');
+    if (imageInput) {
+        imageInput.value = '';
+    }
+
+    // Сбрасываем лейбл
+    const newsImageLabel = document.getElementById('newsImageLabel');
+    if (newsImageLabel) {
+        const fileNameSpan = newsImageLabel.querySelector('.file-name');
+        if (fileNameSpan) fileNameSpan.textContent = 'Выберите изображение...';
+    }
+}
+
 
 async function saveNews() {
     const id = document.getElementById('newsId').value;
@@ -1112,7 +1264,7 @@ async function saveNews() {
     const moduleId = document.getElementById('newsModuleId')?.value;
     let imageUrl = null;
 
-    const imageFile = document.getElementById('newsImageFile').files[0];
+    const imageFile = document.getElementById('newsImageFile').files[0]; // Исправлено: было file, стало imageFile
 
     if (!title || !content) {
         alert('Заполните заголовок и текст');
@@ -1120,9 +1272,9 @@ async function saveNews() {
     }
 
     try {
-        if (imageFile) {
+        if (imageFile) {  // Исправлено: проверяем imageFile, а не file
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', imageFile);  // Исправлено: используем imageFile
             const uploadRes = await fetch(`${API_URL}/api/admin/upload/image`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
@@ -1131,13 +1283,16 @@ async function saveNews() {
             const uploadData = await uploadRes.json();
             imageUrl = uploadData.url;
         } else {
+            // Проверяем, есть ли уже загруженное изображение
             const existingImg = document.getElementById('newsPreviewContainer')?.querySelector('img');
-            if (existingImg) {
+            if (existingImg && existingImg.src) {
                 const src = existingImg.src;
                 if (src.startsWith(API_URL)) {
                     imageUrl = src.replace(API_URL, '');
-                } else {
+                } else if (src.startsWith('http')) {
                     imageUrl = src;
+                } else {
+                    imageUrl = null;
                 }
             }
         }
